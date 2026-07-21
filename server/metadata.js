@@ -212,3 +212,100 @@ export function buildFacets(moments) {
     sport: facet((m) => md(m).sports?.length ? md(m).sports : (md(m).sport ? [md(m).sport] : [])),
   };
 }
+
+
+// ════════════════════════════════════════════════════════════
+// Provenance / verifiability — every moment traces to a real source.
+// ════════════════════════════════════════════════════════════
+const PLATFORM_ICON = { YouTube:'▶', Twitch:'📺', Reddit:'💬', News:'📰', 'Google Trends':'🔎', Steam:'🎮', 'Apple Podcasts':'🎙️', Podcasts:'🎙️' };
+const PLATFORM_CHANNEL = { YouTube:'channel', Twitch:'channel', Reddit:'user', News:'publisher', 'Apple Podcasts':'show', Podcasts:'show' };
+
+export function deriveSourceId(m) {
+  const md = m.meta || {};
+  if (md.sourceId) return md.sourceId;
+  const u = m.url || '';
+  if (m.platform === 'YouTube') return (u.match(/[?&]v=([\w-]{11})/) || u.match(/youtu\.be\/([\w-]{11})/) || [])[1] || md.videoId || '';
+  if (m.platform === 'Reddit') return (u.match(/comments\/([\w]+)/) || [])[1] || m.id.replace(/^rdm-/, '');
+  if (m.platform === 'Twitch') return (u.split('/').pop() || '') || m.id.replace(/^clip-/, '');
+  return m.id;
+}
+export function verificationStatus(m) {
+  const url = !!(m.url);
+  const sid = !!deriveSourceId(m);
+  const plat = m.platform;
+  if (['YouTube', 'Reddit', 'Twitch'].includes(plat)) return (url && sid) ? 'verified' : (url ? 'partial' : 'missing');
+  if (['News', 'Apple Podcasts', 'Podcasts', 'Google Trends', 'Steam'].includes(plat)) return url ? 'verified' : 'partial';
+  return url ? 'partial' : 'missing';
+}
+const VERIFY_META = { verified: ['🟢', 'Verified source'], partial: ['🟡', 'Partially verified'], missing: ['🔴', 'Missing source'] };
+export function verifyMeta(m) { const v = verificationStatus(m); return { status: v, icon: VERIFY_META[v][0], label: VERIFY_META[v][1] }; }
+
+export function buildSource(m) {
+  const md = m.meta || {};
+  return {
+    platform: m.platform || 'Unknown',
+    platformIcon: PLATFORM_ICON[m.platform] || '🔗',
+    url: m.url || '',
+    creator: md.creator || m.author || '',
+    channelLabel: PLATFORM_CHANNEL[m.platform] || 'source',
+    originalTitle: md.originalTitle || m.title || '',
+    publishedTs: md.publishedTs || null,
+    detectedTs: md.detectedTs || md.vaultedTs || null,
+    timestampStart: (md.vodOffset != null) ? md.vodOffset : null,
+    timestampEnd: (md.vodOffset != null && md.duration) ? md.vodOffset + md.duration : null,
+    duration: md.duration || null,
+    thumbnail: m.thumbnail || null,
+    sourceId: deriveSourceId(m),
+    verification: verificationStatus(m),
+  };
+}
+
+/** Real, observed signals that caused detection (NOT model estimates). */
+export function buildDetectedSignals(m) {
+  const md = m.meta || {}; const mt = m.metrics || {}; const out = [];
+  const txt = `${m.title} ${md.eventName || ''}`.toLowerCase();
+  if (mt.velocity > 0) out.push({ label: `High view velocity (${mt.velocity.toLocaleString()}/hr)`, kind: 'velocity' });
+  if (md.analyzed || md.fromBrowser || md.transcriptSource) out.push({ label: 'Caption / transcript activity analysed', kind: 'caption' });
+  if (md.retentionPeak || m.platform === 'YouTube') out.push({ label: m.platform === 'YouTube' ? 'Retention / most-replayed section analysed' : 'Retention peak detected', kind: 'retention' });
+  if (md.eventName) out.push({ label: `Trending event keyword: ${md.eventName}`, kind: 'trend' });
+  else if (md.trendMatch) out.push({ label: `Trending keyword: ${md.trendMatch}`, kind: 'trend' });
+  if (mt.views >= 100000) out.push({ label: `Strong reach (${mt.views.toLocaleString()} views)`, kind: 'engagement' });
+  else if (mt.ups >= 1000) out.push({ label: `Strong engagement (▲ ${mt.ups.toLocaleString()} upvotes)`, kind: 'engagement' });
+  if (md.crossPlatform) out.push({ label: `Mentioned across ${md.crossPlatform.join(' + ')}`, kind: 'cross' });
+  if (m.platform === 'Reddit') out.push({ label: `Top / rising post in r/${(md.category || '').replace('r/', '') || 'subreddit'}`, kind: 'reddit' });
+  if (m.platform === 'News') out.push({ label: 'Published by a tracked news outlet', kind: 'news' });
+  if (!out.length && m.url) out.push({ label: `Sourced from ${m.platform}`, kind: 'source' });
+  return out;
+}
+
+/** Transparent path showing how the moment entered the system. */
+export function buildSourceChain(m) {
+  const md = m.meta || {}; const chain = [{ icon: PLATFORM_ICON[m.platform] || '🔗', label: m.platform || 'Source' }];
+  if (md.analyzed || md.fromBrowser || m.platform === 'YouTube') {
+    chain.push({ icon: '🎬', label: md.fromBrowser ? 'In-browser transcript reader' : 'Video Analyzer' });
+    if (md.transcriptSource === 'paste') chain.push({ icon: '📝', label: 'Pasted transcript' });
+    if (md.retentionPeak) chain.push({ icon: '📈', label: 'Most-replayed peak' });
+    else if (md.analyzed) chain.push({ icon: '📝', label: 'Transcript signals analysed' });
+  } else if (m.platform === 'Reddit') {
+    chain.push({ icon: '💬', label: md.category || 'subreddit' });
+    chain.push({ icon: '🔥', label: 'Top / rising post' });
+    if (md.linkedVideo) chain.push({ icon: '▶', label: 'Linked video' });
+  } else if (m.platform === 'News') {
+    chain.push({ icon: '📰', label: md.originalTitle ? 'Headline match' : 'Tracked feed' });
+  } else if (m.platform === 'Twitch') {
+    chain.push({ icon: '📺', label: 'Live clip' });
+  }
+  chain.push({ icon: '💾', label: 'Saved to Vault' });
+  chain.push({ icon: '🧠', label: 'Compilation Engine' });
+  return chain;
+}
+
+/** Fill provenance on moments that pre-date this layer (back-compat). */
+export function ensureProvenance(m) {
+  const md = m.meta || {};
+  if (!md.source) md.source = buildSource(m);
+  if (!md.sourceChain) md.sourceChain = buildSourceChain(m);
+  if (!md.detectedSignals) md.detectedSignals = buildDetectedSignals(m);
+  if (!md.verification) md.verification = verificationStatus(m);
+  return m;
+}
