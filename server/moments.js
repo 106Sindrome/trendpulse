@@ -10,6 +10,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkItem } from './items.js';
+import { buildSource, buildSourceChain, buildDetectedSignals, verificationStatus, ensureProvenance } from './metadata.js';
 
 const VAULT_FILE = join(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'moments.json');
 const MAX_VAULT = 600;
@@ -172,7 +173,12 @@ export function analyzedToMoment(video, m) {
     duration: m.length,
     analyzed: true,
     score: m.score,
+    detectedTs: Date.now(),
   });
+  meta.source = buildSource({ platform: 'YouTube', url: `https://www.youtube.com/watch?v=${video.id}&t=${m.start}`, author: video.author, title: m.title, meta, thumbnail: video.thumbnail, metrics: { views: m.views || 0, velocity: m.velocity || 0 } });
+  meta.detectedSignals = buildDetectedSignals({ platform: 'YouTube', title: m.title, meta, metrics: { views: m.views || 0, velocity: m.velocity || 0 } });
+  meta.sourceChain = buildSourceChain({ platform: 'YouTube', meta });
+  meta.verification = 'verified';
   return mkItem({
     id: `yta-${video.id}-${m.start}`,
     section: 'moments', source: 'analyzer', platform: 'YouTube', kind: 'moment',
@@ -207,7 +213,7 @@ export async function loadVault() {
   } catch {
     vault = [];
   }
-  for (const m of vault) knownIds.add(m.id);
+  for (const m of vault) { knownIds.add(m.id); ensureProvenance(m); }
   return vault.length;
 }
 
