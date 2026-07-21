@@ -45,6 +45,17 @@ The per-card competition chip is an **estimate from real signals that cost no AP
 
 ---
 
+## 🔒 Trust model — the Vault is verifiable, never invented
+
+The Vault stores **references, not copies**, and every item answers *where / why / can I verify it*:
+
+- **Real source, always** — each moment keeps platform, original URL, creator/channel, original title, upload date, detection date, timestamp range, source ID, and a **verification status** (🟢 Verified / 🟡 Partial / 🔴 Missing). One click: ▶ Open original · ⏱ Jump to timestamp · 📺 Open channel · 🔗 Copy link · 📋 Copy timestamp.
+- **Detected vs Estimated, visually split** — the details panel shows **✓ Why this moment was detected** (real signals: most-replayed peak, caption activity, trending keyword, view velocity, engagement, cross-platform mentions) *separately* from **🧠 AI analysis** (emotion, replayability, meme potential, competition…), the latter clearly badged *estimated · not fact*.
+- **Source chain** — a transparent path per item, e.g. `YouTube → Video Analyzer → Transcript signals analysed → Saved to Vault → Compilation Engine`, or `Reddit → r/soccer → Top post → Linked video → …`.
+- **Compilations are fully traceable** — opening a collection lists every clip with its platform, creator, timestamp and an *Open original* link; the engine never proposes a "Top 5" it can't source.
+
+No clip, score, or recommendation exists without a link back to a real origin.
+
 ## 🚀 Quick start
 
 ```bash
