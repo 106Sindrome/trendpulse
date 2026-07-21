@@ -32,7 +32,7 @@ function idea({ title, hook, formats, difficulty, evidence, sources, strength })
     timeless: true,
     tags: formats,
     metrics: { score: Math.min(98, Math.round(35 + strength)), growth: 0, velocity: 0 },
-    meta: { difficulty, evidence: evidence.slice(0, 4), sources: sources.slice(0, 4), hook },
+    meta: { difficulty, evidence: (evidence || []).slice(0, 4), sources: (sources || []).slice(0, 4), hook },
   });
 }
 
