@@ -273,7 +273,11 @@ function cardShell(id) {
 function statusBanner(sec) {
   const req = sec.meta?.requires;
   const errSrc = (sec.meta?.sources || []).find((s) => s.mode === 'error');
-  if (!sec.items.length && req) {
+  const needsSrc = (sec.meta?.sources || []).find((s) => (s.mode || '').includes('needs'));
+  if (!sec.items.length && errSrc) {
+    return `<div class="setup err">⚠️ Source failing: <b>${esc(errSrc.label)}</b><br><span class="err-msg">${esc(errSrc.error || 'unknown error')}</span><br><span>This key is set but YouTube rejected the call — run <code>docker compose exec trendpulse sh -c 'wget -qO- "https://www.googleapis.com/youtube/v3/videos?part=snippet&id=dQw4w9WgXcQ&key=$YOUTUBE_API_KEY" | head -c 200'</code> and send the output.</span></div>`;
+  }
+  if (!sec.items.length && (req || needsSrc)) {
     return `<div class="setup">🔌 This section needs <b>${esc(req.vars.join(' + '))}</b><br>${esc(req.hint || '')}<br>
       <span>Add it to <code>.env</code> then run <code>docker compose up --build</code> — nothing fake is shown in its place.</span></div>`;
   }
@@ -469,6 +473,7 @@ function vaultCard(m) {
       ${m.thumbnail ? `<img loading="lazy" src="${esc(m.thumbnail)}" alt="" onerror="this.style.display='none'">` : ''}
       ${emo ? `<span class="vlib-emo">${EMOJI[emo] || '•'}</span>` : ''}
       ${md.duration ? `<span class="vlib-dur">${fmtVidLen(md.duration)}</span>` : ''}
+      <span class="vdot vdot-${md.verification||'partial'}" title="${esc((md.verification||'partial'))}"></span>
       <span class="star ${state.bookmarks.some((b) => b.id === m.id) ? 'on' : ''}" data-bm="${esc(m.id)}">${state.bookmarks.some((b) => b.id === m.id) ? '★' : '☆'}</span>
     </div>
     <div class="vlib-body">
@@ -587,7 +592,8 @@ function wireCompActions(root) {
   root.querySelectorAll('[data-compopen]').forEach((b) => b.onclick = () => {
     const c = vstate().compilations.find((x) => x.id === b.dataset.compopen); if (!c) return;
     const clips = compClips(c);
-    openModal('📂 ' + c.title, `<div class="comp-stats" style="padding:0 0 10px"><span><b>${c.clipCount}</b> clips</span><span>≈ <b>${esc(c.estDuration)}</b></span><span><b>${esc(c.difficulty)}</b></span></div><div class="vlib-grid">${clips.map(vaultCard).join('')}</div>`);
+    const trace = clips.map((m,i)=>{ const src=m.meta?.source||{}; const ts=(src.timestampStart!=null)?fmtHMS(src.timestampStart):''; return `<div class="clip-trace"><span class="ct-n">${i+1}</span>${src.platformIcon||'🔗'} <b>${esc(src.platform||m.platform)}</b> · ${esc(src.creator||m.author||'')} ${ts?'· ⏱ '+esc(ts):''}<span class="sp"></span>${src.url?`<a class="mini-link" href="${esc(src.url)}" target="_blank" rel="noopener">Open original ↗</a>`:''}</div>`; }).join('');
+    openModal('📂 ' + c.title, `<div class="comp-stats" style="padding:0 0 10px"><span><b>${c.clipCount}</b> clips</span><span>≈ <b>${esc(c.estDuration)}</b></span><span><b>${esc(c.difficulty)}</b></span><span class="why">every clip traceable to its source</span></div><div class="clip-trace-list">${trace}</div><details style="margin-top:10px"><summary style="cursor:pointer;color:var(--muted);font-size:12px">Browse clips</summary><div class="vlib-grid" style="margin-top:8px">${clips.map(vaultCard).join('')}</div></details>`);
   });
   const act = (key, fn) => root.querySelectorAll(`[data-${key}]`).forEach((b) => b.onclick = () => { const c = vstate().compilations.find((x) => x.id === b.dataset[key]); if (c) fn(c); });
   act('comporder', (c) => { const t = compClips(c).map((m, i) => `${i + 1}. ${m.title} — ${m.url}`).join('\n'); navigator.clipboard.writeText(`Clip order — ${c.title}\n` + t).then(() => toast({ icon: '📋', title: 'Clip order copied' })); });
@@ -1261,45 +1267,70 @@ function breakdownHTML(it) {
 }
 function drawerHTML(it) {
   const on = state.bookmarks.some((b) => b.id === it.id);
-  const live = it.meta?.live;
+  const md = it.meta || {};
+  const src = md.source || { platform: it.platform, url: it.url, creator: md.creator || it.author, originalTitle: it.title, verification: md.verification || 'partial' };
+  const ver = md.verification || src.verification || 'partial';
+  const vIcon = ver === 'verified' ? '🟢' : ver === 'missing' ? '🔴' : '🟡';
+  const vLabel = ver === 'verified' ? 'Verified source' : ver === 'missing' ? 'Missing source' : 'Partially verified';
+  const signals = md.detectedSignals || [];
+  const chain = md.sourceChain || [];
+  const sc = md.scores || {};
+  const ts = (src.timestampStart != null) ? fmtHMS(src.timestampStart) + (src.timestampEnd != null ? ' → ' + fmtHMS(src.timestampEnd) : '') : null;
+  const factRow = (icon, k, v) => v ? `<div class="vmeta-row"><span class="k">${icon} ${esc(k)}</span><span class="v">${esc(String(v))}</span></div>` : '';
   return `
   <header class="dr-h">
     <div style="flex:1;min-width:0">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:7px">${platformBadge(it.platform)}
-        ${live ? '<span class="live-chip">LIVE ON TWITCH</span>' : ''}
-        <span class="rs">${esc(it.category)}</span></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:7px;flex-wrap:wrap">
+        ${platformBadge(it.platform)}
+        <span class="verify-badge verify-${ver}" title="${esc(vLabel)}">${vIcon} ${esc(vLabel)}</span>
+        ${md.momentType ? `<span class="badge" style="color:var(--muted);border-color:var(--border)">${esc(md.momentType)}</span>` : ''}
+      </div>
       <div class="dr-title">${esc(it.title)}</div>
-      <div class="dr-sub">${esc(it.subtitle || it.author)}</div>
+      <div class="dr-sub">${esc(md.creator || it.author || '')}</div>
     </div>
     <button class="x" id="dr-close">✕</button>
   </header>
   <div class="dr-body">
     ${embedHTML(it)}
-    ${metricsGrid(it)}
-    ${it.meta?.vodOffset != null ? `<div class="vod-tag" style="font-size:12px">⏱ Real timestamp: clip starts at ${fmtHMS(it.meta.vodOffset)} in the source VOD · ${it.meta.duration || '?'}s long</div>` : ''}
-    ${it.kind === 'opportunity' ? `
-      <div class="dr-block"><h3>Trend lifecycle</h3>${stageTimeline(it.meta?.stage)}</div>
-      <div class="dr-block"><h3>Hooks (copy & adapt)</h3><ul class="hook-list">${(it.meta?.hooks || []).map((h) => `<li>${esc(h)}</li>`).join('')}</ul></div>
-      ${(it.meta?.hashtags || []).length ? `<div class="dr-block"><h3>Hashtags</h3><div class="opp-tags">${it.meta.hashtags.map((t) => `<span>${esc(t)}</span>`).join('')}</div></div>` : ''}
-      <div class="dr-block"><h3>Competition & similar Shorts</h3>
-        <button class="btn" id="dr-scan-btn" style="margin-bottom:10px">🔍 Run deep scan (real YouTube data)</button>
-        <div id="scan-slot"></div>
-      </div>` : ''}
-    ${(it.meta?.scores) ? `<div class="dr-block"><h3>Quality & potential scores (model estimates)</h3><div class="score-grid">${[['Virality',it.meta.scores.virality],['Evergreen',it.meta.scores.evergreen],['Emotion',it.meta.scores.emotion],['Replayability',it.meta.scores.replayability],['Competition',it.meta.scores.competition],['Meme potential',it.meta.scores.memePotential],['Clip quality',it.meta.scores.clipQuality],['Audio quality',it.meta.scores.audioQuality],['Visual quality',it.meta.scores.visualQuality],['Editing difficulty',it.meta.scores.editingDifficulty]].map(([l,v])=>`<div class="bd-row"><span>${l}</span><div class="bd-bar"><i style="width:${v||0}%"></i></div><em>${v??'–'}</em></div>`).join('')}</div></div>` : ''}
-    ${(it.meta?.tags?.length||it.meta?.momentType||it.meta?.people?.length||it.meta?.teams?.length) ? `<div class="dr-block"><h3>Auto metadata</h3><div class="vmeta-row">${it.meta.momentType?`<span class="k">type</span><span class="v">${esc(it.meta.momentType)}</span>`:''}${(it.meta.people||[]).length?`<span class="k">people</span><span class="v">${esc(it.meta.people.join(', '))}</span>`:''}${(it.meta.teams||[]).length?`<span class="k">teams</span><span class="v">${esc(it.meta.teams.join(', '))}</span>`:''}${(it.meta.games||[]).length?`<span class="k">games</span><span class="v">${esc(it.meta.games.join(', '))}</span>`:''}</div><div class="vlib-tags" style="margin-top:6px">${(it.meta.tags||[]).map(t=>`<span>${esc(t)}</span>`).join('')}${Object.keys(it.meta.emotions||{}).map(e=>`<span class="emo">${esc(e)}</span>`).join('')}</div></div>` : ''}
-    ${it.kind==='moment' ? `<button class="btn" id="dr-used">${usedIds().has(it.id)?'✓ Marked as used':'Mark as used (for Unused filters)'}</button>` : ''}
+    <div class="dr-block"><h3>🔎 Verified source (real data)</h3>
+      <div class="vmeta-grid">
+        ${factRow(src.platformIcon || '🔗', 'Platform', src.platform)}
+        ${factRow('👤', src.channelLabel || 'Creator', src.creator)}
+        ${factRow('🎬', 'Original', src.originalTitle)}
+        ${factRow('⏱', 'Timestamp', ts)}
+        ${factRow('📅', 'Uploaded', src.publishedTs ? new Date(src.publishedTs).toLocaleDateString() : null)}
+        ${factRow('🕒', 'Detected', (md.detectedTs || md.vaultedTs) ? new Date(md.detectedTs || md.vaultedTs).toLocaleDateString() : null)}
+        ${factRow('', 'Duration', src.duration ? src.duration + 's' : null)}
+      </div>
+    </div>
+    <div class="dr-block"><h3>✓ Why this moment was detected (real signals)</h3>
+      ${signals.length ? `<ul class="detected-list">${signals.map((sg) => `<li>${esc(sg.label)}</li>`).join('')}</ul>` : '<div class="rs">No recorded detection signals.</div>'}
+    </div>
+    <div class="dr-block"><h3>🧠 AI analysis <span class="ai-tag">estimated · not fact</span></h3>
+      <div class="score-grid">${[['Emotion',sc.emotion],['Replayability',sc.replayability],['Meme potential',sc.memePotential],['Competition',sc.competition],['Virality',sc.virality],['Evergreen',sc.evergreen],['Clip quality',sc.clipQuality],['Editing difficulty',sc.editingDifficulty]].filter(([,v])=>v!=null).map(([l,v])=>`<div class="bd-row"><span>${l}</span><div class="bd-bar"><i style="width:${v||0}%"></i></div><em>${v}</em></div>`).join('')}</div>
+      <div class="vlib-tags" style="margin-top:8px">${(md.tags||[]).map(t=>`<span>${esc(t)}</span>`).join('')}${Object.keys(md.emotions||{}).map(e=>`<span class="emo">${esc(e)}</span>`).join('')}</div>
+    </div>
+    <div class="dr-block"><h3>🔗 Source chain</h3>
+      <div class="source-chain">${chain.map((c,i)=>`${i?'<span class="sc-arrow">↓</span>':''}<span class="sc-step"><span class="sc-ic">${c.icon}</span>${esc(c.label)}</span>`).join('')}</div>
+    </div>
     ${sparkSVG(it.history, 'bigspark', 460, 64)}
-    ${breakdownHTML(it)}
     <div class="dr-links">
-      <a class="btn primary" href="${esc(it.url)}" target="_blank" rel="noopener">Open ↗</a>
+      ${src.url ? `<a class="btn primary" href="${esc(src.url)}" target="_blank" rel="noopener">▶ Open original</a>` : ''}
+      ${(src.url && ts) ? `<a class="btn" href="${esc(src.url)}" target="_blank" rel="noopener">⏱ Jump to timestamp</a>` : ''}
+      ${src.creator ? `<a class="btn" href="${esc(channelUrl(src.platform, src.creator))}" target="_blank" rel="noopener">📺 Open ${esc(src.channelLabel||'channel')}</a>` : ''}
+      ${src.url ? `<button class="btn" id="dr-copyurl">🔗 Copy link</button>` : ''}
+      ${ts ? `<button class="btn" id="dr-copyts">📋 Copy timestamp</button>` : ''}
       <button class="btn" id="dr-bm">${on ? '★ Bookmarked' : '☆ Bookmark'}</button>
-      ${it.kind === 'opportunity' ? `<button class="btn" id="dr-plan">📋 Copy clip plan</button>` : ''}
-      ${it.meta?.twitchLogin ? `<a class="btn" href="https://www.twitch.tv/${encodeURIComponent(it.meta.twitchLogin)}" target="_blank" rel="noopener">Twitch ↗</a>` : ''}
-      <a class="btn" href="https://x.com/search?q=${encodeURIComponent(it.author || it.title)}" target="_blank" rel="noopener">Search on X ↗</a>
-      ${it.embed?.type === 'youtube' && it.embed.id ? `<button class="btn" id="dr-findclip">🎬 Find clips in this video</button>` : ''}
+      ${it.embed?.type === 'youtube' && it.embed.id ? `<button class="btn" id="dr-findclip">🎬 Re-analyze</button>` : ''}
     </div>
     ${(it.tags || []).length ? `<div class="tags">${it.tags.map((t) => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}
   </div>`;
+}
+function channelUrl(platform, creator) {
+  if (platform === 'YouTube') return 'https://www.youtube.com/@' + encodeURIComponent(creator.replace(/^@/, ''));
+  if (platform === 'Twitch') return 'https://www.twitch.tv/' + encodeURIComponent(creator);
+  if (platform === 'Reddit') return 'https://www.reddit.com/user/' + encodeURIComponent(creator.replace(/^u\//, ''));
+  return '#';
 }
 function wireDrawer(it) {
   $('#dr-close').onclick = closeDrawer;
@@ -1324,6 +1355,8 @@ function wireDrawer(it) {
     scanBtn.onclick = run;
   }
   const _u = $('#dr-used'); if (_u) _u.onclick = () => { toggleUsed(it.id); _u.textContent = usedIds().has(it.id) ? '✓ Marked as used' : 'Mark as used (for Unused filters)'; refreshVault().then(()=>{ if(state.sections.get('moments')) renderMoments(state.sections.get('moments')); }); };
+  const _cu = $('#dr-copyurl'); if (_cu) _cu.onclick = () => { const u = (it.meta?.source?.url || it.url); navigator.clipboard?.writeText(u).then(()=>toast({icon:'🔗',title:'Source link copied'})); };
+  const _ct = $('#dr-copyts'); if (_ct) _ct.onclick = () => { const st = it.meta?.source?.timestampStart; const txt = fmtHMS(st) + ' — ' + (it.meta?.source?.originalTitle || it.title) + ' ' + (it.meta?.source?.url||''); navigator.clipboard?.writeText(txt).then(()=>toast({icon:'📋',title:'Timestamp copied'})); };
   $('#dr-bm').onclick = () => {
     toggleBookmark(it);
     $('#dr-bm').textContent = state.bookmarks.some((b) => b.id === it.id) ? '★ Bookmarked' : '☆ Bookmark';
