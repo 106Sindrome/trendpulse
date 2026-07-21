@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TrendPulse — Find your next viral clip</title>
+  <meta name="description" content="Real-time trend terminal for creators. Track Speed, Kai Cenat, Joe Rogan and more — discover the videos, topics and Top-5 ideas worth turning into Shorts, Reels and TikToks. 100% real data.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%238b5cf6'/%3E%3Cstop offset='1' stop-color='%2322d3ee'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='24' fill='%230a0c12'/%3E%3Cpath d='M56 12 24 56h20l-6 32 34-46H50l6-30z' fill='url(%23g)'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <!-- ── Sidebar ─────────────────────────────────────── -->
+    <aside class="sidebar">
+      <div class="logo">
+        <svg width="30" height="30" viewBox="0 0 100 100"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b5cf6"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs><rect width="100" height="100" rx="24" fill="rgba(139,92,246,.12)"/><path d="M56 12 24 56h20l-6 32 34-46H50l6-30z" fill="url(#lg)"/></svg>
+        <div class="logo-text"><b>TrendPulse</b><span>clip intelligence</span></div>
+      </div>
+      <nav class="nav" id="nav">
+        <a data-target="top" class="active"><span class="ni">▦</span>Dashboard</a>
+        <a data-target="now"><span class="ni">🔥</span>Rankings</a>
+        <a data-target="toplists"><span class="ni">🏆</span>Top Lists</a>
+        <a data-target="creators"><span class="ni">🎯</span>Creators</a>
+        <a data-target="ideas"><span class="ni">💡</span>Top 5 Ideas</a>
+        <a data-target="moments"><span class="ni">🏆</span>Moments</a>
+        <a data-target="videos"><span class="ni">🎥</span>Videos</a>
+        <a data-target="trends"><span class="ni">🔎</span>Topics</a>
+        <a data-target="reddit"><span class="ni">💬</span>Reddit</a>
+        <a data-target="news"><span class="ni">⚡</span>News</a>
+        <a data-target="games"><span class="ni">🎮</span>Games</a>
+        <a data-target="podcasts"><span class="ni">🎙️</span>Podcasts</a>
+        <a data-target="viral"><span class="ni">📈</span>Viral Radar</a>
+        <a data-target="bookmarks" id="nav-bookmarks"><span class="ni">★</span>Bookmarks<span class="bm-count" id="bm-count" hidden>0</span></a>
+      </nav>
+      <div class="side-foot">
+        <div class="src-mini" id="src-mini"></div>
+        <div class="ver">TrendPulse 0.2 · <span id="side-clock"></span></div>
+      </div>
+    </aside>
+
+    <!-- ── Main ────────────────────────────────────────── -->
+    <div class="main">
+      <header class="topbar">
+        <button class="search-btn" id="search-btn" title="Search (Ctrl+K)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <span>Search creators, videos, topics…</span>
+          <kbd>⌘K</kbd>
+        </button>
+        <div class="top-actions">
+          <button class="analyze-btn" id="analyze-btn" title="Paste a YouTube URL — find the moments worth clipping">🎬 Analyze video</button>
+          <div class="conn" id="conn"><i></i><span>connecting…</span></div>
+          <button class="icon-btn bell" id="bell-btn" title="Notifications">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+            <em id="bell-dot" hidden>0</em>
+          </button>
+          <button class="icon-btn" id="theme-btn" title="Toggle theme">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+          </button>
+          <button class="icon-btn" id="settings-btn" title="Sources & settings">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.9 2.9l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.9-2.9l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.9-2.9l.1.1a1.7 1.7 0 0 0 1.9.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5h.1a1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.9 2.9l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="filterbar">
+        <div class="window-tabs" id="window-tabs">
+          <button data-win="day" class="on">Last 24 hours</button>
+          <button data-win="week">Last 7 days</button>
+        </div>
+        <select id="platform-select"><option value="all">All platforms</option></select>
+        <div class="autorefresh"><i class="pulse"></i> Auto-refresh · SSE <span id="last-sync">—</span></div>
+      </div>
+
+      <main class="grid" id="grid"><!-- cards injected --></main>
+
+      <footer class="foot">
+        <span>TrendPulse · 100% real data — nothing simulated</span>
+        <span id="foot-sources"></span>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Overlays -->
+  <div class="backdrop" id="backdrop" hidden></div>
+  <aside class="drawer" id="drawer" hidden></aside>
+  <div class="modal-wrap" id="modal-wrap" hidden><div class="modal" id="modal"></div></div>
+  <div class="notif-pop" id="notif-pop" hidden></div>
+  <div class="toasts" id="toasts"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
