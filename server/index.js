@@ -84,6 +84,13 @@ function tilePayload(result) {
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   try {
+    if (u.pathname === '/api/config') {
+      const k = env.YOUTUBE_API_KEY || '';
+      return send(res, 200, JSON.stringify({
+        youtube: { present: !!k, len: k.length, first4: k.slice(0, 4), last4: k.slice(-4), hasSpace: /\s/.test(k), hasQuote: /["']/.test(k) },
+        twitch: !!env.TWITCH_CLIENT_ID, reddit: !!(env.REDDIT_CLIENT_ID && env.REDDIT_CLIENT_SECRET && env.REDDIT_USERNAME && env.REDDIT_PASSWORD),
+      }));
+    }
     if (u.pathname === '/api/health') {
       return send(res, 200, JSON.stringify({ ok: true, version: store.version, ts: Date.now() }));
     }
